@@ -1,0 +1,16 @@
+# ~/.config/ibus-voice/config.toml
+
+[hotkey]
+ptt = "CapsLock"          # 暂仅支持 CapsLock；后续可扩展 F9 / RightCtrl 等
+cancel = "Escape"
+
+[audio]
+device = "default"        # ALSA PCM device name; "default" 走 PipeWire
+sample_rate = 16000
+
+[stt]
+model_dir = "~/.local/share/ibus-voice/models/paraformer-zh"
+num_threads = 4
+
+[ui]
+show_aux = true

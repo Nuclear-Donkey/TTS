@@ -1,0 +1,45 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Virtualenv
+.venv/
+venv/
+env/
+
+# Build artifacts
+build/
+dist/
+*.egg
+*.whl
+
+# IDE / editor
+.vscode/
+.idea/
+*.swp
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Project-specific
+# Runtime logs / cache dirs if they ever end up in the tree
+*.log
+/logs/
+
+# Downloaded models (too large; users fetch via scripts)
+/models/
+*.onnx
+!src/voice_input_win/*.onnx
+*.tar.bz2
+
+# Local config / scratch
+/.claude/settings.local.json
+/tmp/
+*.wav

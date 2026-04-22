@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  IBus component descriptor for the voice input engine.
+  Installed to ~/.local/share/ibus/component/voice.xml by scripts/install.sh.
+  The <exec> path is rewritten by the install script to match the actual venv.
+-->
+<component>
+  <name>org.freedesktop.IBus.Voice</name>
+  <description>Voice input (Paraformer local STT)</description>
+  <exec>@EXEC_PATH@</exec>
+  <version>0.1.0</version>
+  <author>zs</author>
+  <license>MIT</license>
+  <homepage></homepage>
+  <textdomain>voice-ibus</textdomain>
+
+  <engines>
+    <engine>
+      <name>voice</name>
+      <language>zh</language>
+      <license>MIT</license>
+      <author>zs</author>
+      <layout>default</layout>
+      <longname>Voice</longname>
+      <description>Push-to-talk voice input (中文 Paraformer)</description>
+      <icon>audio-input-microphone</icon>
+      <rank>50</rank>
+      <symbol>🎤</symbol>
+    </engine>
+  </engines>
+</component>

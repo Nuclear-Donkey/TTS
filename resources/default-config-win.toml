@@ -1,0 +1,33 @@
+# voice-input-win configuration
+# Location: %APPDATA%\voice-input\config.toml  (typically C:\Users\<you>\AppData\Roaming\voice-input\config.toml)
+
+[hotkey]
+# Push-to-talk key name (see `keyboard` library docs). Recommended:
+#   "right alt"   — rarely used on Chinese keyboards, no side effects
+#   "caps lock"   — classic PTT; Windows will still toggle the caps lock LED
+#   "f9"          — function keys are safe
+#   "right ctrl"  — works but can conflict with some shortcuts
+ptt = "right alt"
+
+[audio]
+# sounddevice device identifier. Empty = system default input.
+# Can be a numeric index ("3") or a name substring ("USB Microphone").
+# List devices with: py -c "import sounddevice; print(sounddevice.query_devices())"
+device = ""
+sample_rate = 16000
+
+[stt]
+# Model directory. Default uses %LOCALAPPDATA%\voice-input\models\paraformer-zh.
+# Override if you downloaded to a custom path.
+# model_dir = "C:\\models\\paraformer-zh"
+num_threads = 4
+
+[inject]
+# "paste" = clipboard + Ctrl+V (recommended, universal compatibility)
+method = "paste"
+# Restore user's original clipboard after ~0.5s. Set false if you hit
+# apps that delay paste >500ms.
+restore_clipboard = true
+# Seconds between setting clipboard and sending Ctrl+V. Raise if the
+# target app gets empty pastes.
+paste_delay = 0.05
