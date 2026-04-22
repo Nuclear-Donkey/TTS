@@ -1,10 +1,4 @@
-"""TOML config loader for Windows voice input.
-
-Separate from the Linux voice_ibus config because:
-- different default paths (%LOCALAPPDATA% vs ~/.local/share)
-- different hotkey semantics ("right alt" vs keyval 0xffe5)
-- no IBus-specific [ui] options
-"""
+"""TOML config loader for macOS voice input."""
 from __future__ import annotations
 
 import logging
@@ -13,20 +7,20 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from voice_input_common.config import apply_section
-from voice_input_win.paths import CONFIG_FILE, MODEL_DIR
+from voice_input_macos.paths import CONFIG_FILE, MODEL_DIR
 
 log = logging.getLogger(__name__)
 
 
 @dataclass
 class HotkeyConfig:
-    # Any keyboard lib key name. Common: "right alt", "caps lock", "f9", "right ctrl"
-    ptt: str = "right alt"
+    # pynput key name: "caps_lock", "right_option", "left_option", "f9", etc.
+    ptt: str = "caps_lock"
 
 
 @dataclass
 class AudioConfig:
-    # sounddevice device index (int) or name substring, or empty for system default
+    # sounddevice device index (int) or name substring, empty for system default
     device: str = ""
     sample_rate: int = 16_000
 
@@ -39,14 +33,12 @@ class SttConfig:
 
 @dataclass
 class InjectConfig:
-    # "paste" = clipboard + Ctrl+V (recommended)
-    # "type"  = simulated keystrokes (kept for future, less reliable for CJK)
+    # "paste" = clipboard + Cmd+V via pynput (recommended)
+    # "applescript" = AppleScript Cmd+V (no Accessibility permission needed)
     method: str = "paste"
-    # After pasting, restore the user's original clipboard (best-effort).
     restore_clipboard: bool = True
-    # Small delay (seconds) between setting clipboard and sending Ctrl+V so
-    # Windows has time to update the clipboard for the target app.
-    paste_delay: float = 0.05
+    # Slightly higher than Windows (0.05) due to macOS clipboard sync
+    paste_delay: float = 0.08
 
 
 @dataclass
@@ -76,10 +68,6 @@ def load(path: Path = CONFIG_FILE) -> Config:
         ("inject", cfg.inject),
     ]:
         if section_name in raw:
-            _apply(section_obj, raw[section_name])
+            apply_section(section_obj, raw[section_name])
     log.info("loaded config from %s", path)
     return cfg
-
-
-def _apply(section_obj, values: dict) -> None:
-    apply_section(section_obj, values)

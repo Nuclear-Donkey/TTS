@@ -22,22 +22,34 @@ import tempfile
 import urllib.request
 from pathlib import Path
 
-DEFAULT_DEST = Path.home() / ".local/share/ibus-voice/models/paraformer-zh"
+import platform
+
+def _default_dest() -> Path:
+    if platform.system() == "Darwin":
+        return Path.home() / "Library/Application Support/voice-input/models/paraformer-zh"
+    return Path.home() / ".local/share/ibus-voice/models/paraformer-zh"
+
+DEFAULT_DEST = _default_dest()
 
 MODELS = {
     "full": {
         "name": "sherpa-onnx-paraformer-zh-2024-03-09",
         "url": "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-paraformer-zh-2024-03-09.tar.bz2",
+        "hf_repo": "csukuangfj/sherpa-onnx-paraformer-zh-2024-03-09",
         "size_mb": 230,
         "primary_weight": "model.int8.onnx",
     },
     "small": {
         "name": "sherpa-onnx-paraformer-zh-small-2024-03-09",
         "url": "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-paraformer-zh-small-2024-03-09.tar.bz2",
+        "hf_repo": "csukuangfj/sherpa-onnx-paraformer-zh-small-2024-03-09",
         "size_mb": 79,
         "primary_weight": "model.int8.onnx",
     },
 }
+
+HF_MIRROR = "https://hf-mirror.com"
+HF_FILES = ["model.int8.onnx", "tokens.txt"]
 
 
 def _download(url: str, dest_file: Path) -> None:
@@ -61,6 +73,19 @@ def _download(url: str, dest_file: Path) -> None:
                     print(f"  {got/1e6:7.1f} / {total/1e6:.1f} MB  ({pct:5.1f}%)", end="\r")
         print()
         print(f"  sha256: {h.hexdigest()}")
+
+
+def _download_from_hf_mirror(hf_repo: str, dest: Path) -> None:
+    """Download model files individually from hf-mirror.com (Chinese HuggingFace mirror)."""
+    dest.mkdir(parents=True, exist_ok=True)
+    for fname in HF_FILES:
+        url = f"{HF_MIRROR}/{hf_repo}/resolve/main/{fname}"
+        dest_file = dest / fname
+        if dest_file.exists():
+            print(f"  {fname} already exists, skipping")
+            continue
+        print(f"Downloading {fname} from hf-mirror...")
+        _download(url, dest_file)
 
 
 def _extract(tarball: Path, dest: Path) -> None:
@@ -107,18 +132,30 @@ def main() -> int:
         return 0
 
     args.dest.mkdir(parents=True, exist_ok=True)
+
+    # Try tarball download first (GitHub)
+    downloaded = False
     with tempfile.TemporaryDirectory(prefix="voice-ibus-dl-") as tmpdir:
         tarball = Path(tmpdir) / "model.tar.bz2"
         try:
             _download(url, tarball)
+            _extract(tarball, args.dest)
+            downloaded = True
         except Exception as e:
-            print(f"Download failed: {e}", file=sys.stderr)
+            print(f"GitHub download failed: {e}", file=sys.stderr)
+
+    # Fallback: download individual files from hf-mirror
+    if not downloaded:
+        print("Trying hf-mirror.com (Chinese HuggingFace mirror)...")
+        try:
+            _download_from_hf_mirror(info["hf_repo"], args.dest)
+        except Exception as e:
+            print(f"hf-mirror download also failed: {e}", file=sys.stderr)
             print("", file=sys.stderr)
-            print("Try a mirror with --url, e.g. a ModelScope/HuggingFace mirror,", file=sys.stderr)
-            print("or download the .tar.bz2 manually and extract to:", file=sys.stderr)
-            print(f"  {args.dest}", file=sys.stderr)
+            print("Manual download options:", file=sys.stderr)
+            print(f"  1. Download from {HF_MIRROR}/{info['hf_repo']}", file=sys.stderr)
+            print(f"  2. Extract to: {args.dest}", file=sys.stderr)
             return 1
-        _extract(tarball, args.dest)
 
     ok = expected.exists() and tokens.exists()
     if not ok:

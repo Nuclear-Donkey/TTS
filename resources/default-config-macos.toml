@@ -1,0 +1,28 @@
+# voice-input-macos configuration
+# Location: ~/Library/Application Support/voice-input/config.toml
+
+[hotkey]
+# Push-to-talk key. pynput key names:
+#   "caps_lock"     — same as Linux (default)
+#   "right_option"  — rarely used
+#   "left_option"   — may conflict with shortcuts
+#   "right_cmd"     — safe but unusual
+#   "f9" / "f12"    — function keys, no conflicts
+ptt = "caps_lock"
+
+[audio]
+# sounddevice device identifier. Empty = system default input.
+# List devices: python3 -c "import sounddevice; print(sounddevice.query_devices())"
+device = ""
+sample_rate = 16000
+
+[stt]
+# model_dir = "~/Library/Application Support/voice-input/models/paraformer-zh"
+num_threads = 4
+
+[inject]
+# "paste" = clipboard + Cmd+V via pynput (needs Accessibility permission)
+# "applescript" = AppleScript Cmd+V (no Accessibility permission needed, slower)
+method = "paste"
+restore_clipboard = true
+paste_delay = 0.08
