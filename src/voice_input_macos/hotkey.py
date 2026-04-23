@@ -21,13 +21,14 @@ from typing import Callable
 from pynput import keyboard
 
 from voice_input_macos.injector import InjectError, paste_text
+from voice_input_macos.paths import LOG_DIR
 from voice_input_common.audio import Recorder, RecorderError, pcm_rms, pcm_to_wav
 
 log = logging.getLogger(__name__)
 
 MIN_AUDIO_SECONDS = 0.2
 SILENCE_RMS_THRESHOLD = 60.0
-DEBUG_WAV_ON_FAILURE = Path.cwd()
+DEBUG_WAV_ON_FAILURE = LOG_DIR
 
 
 class State(enum.Enum):
@@ -78,6 +79,7 @@ class HotkeyController:
         paste_delay: float = 0.08,
         on_status: StatusCallback | None = None,
         on_state_change: Callable[[State], None] | None = None,
+        on_text: Callable[[str], None] | None = None,
     ) -> None:
         self._ptt_key = _resolve_ptt_key(ptt_key)
         self._ptt_name = ptt_key
@@ -88,6 +90,7 @@ class HotkeyController:
         self._paste_delay = paste_delay
         self._on_status = on_status or (lambda s: None)
         self._on_state_change = on_state_change or (lambda s: None)
+        self._on_text = on_text or (lambda s: None)
 
         self._state = State.IDLE
         self._rec_started_at = 0.0
@@ -199,6 +202,7 @@ class HotkeyController:
         except Exception as e:
             log.exception("STT failed")
             try:
+                DEBUG_WAV_ON_FAILURE.mkdir(parents=True, exist_ok=True)
                 fail_path = DEBUG_WAV_ON_FAILURE / f"voice-failed-{int(time.time())}.wav"
                 pcm_to_wav(pcm, fail_path)
                 log.info("dumped failed audio to %s", fail_path)
@@ -228,4 +232,8 @@ class HotkeyController:
 
         preview = text if len(text) <= 30 else text[:30] + "..."
         self._status(f" {preview}")
+        try:
+            self._on_text(text)
+        except Exception:
+            log.exception("on_text callback failed")
         self._set_state(State.IDLE)

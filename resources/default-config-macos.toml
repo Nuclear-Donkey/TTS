@@ -3,12 +3,16 @@
 
 [hotkey]
 # Push-to-talk key. pynput key names:
-#   "caps_lock"     — same as Linux (default)
-#   "right_option"  — rarely used
+#   "right_option"  — default, safe, rarely conflicts
 #   "left_option"   — may conflict with shortcuts
 #   "right_cmd"     — safe but unusual
 #   "f9" / "f12"    — function keys, no conflicts
-ptt = "caps_lock"
+#   "caps_lock"     — NOT RECOMMENDED on macOS: it's a toggle key, so
+#                     pynput won't fire a release when you let go.
+#                     If you really want it, disable Caps Lock toggle in
+#                     System Settings > Keyboard > Keyboard Shortcuts >
+#                     Modifier Keys first.
+ptt = "right_option"
 
 [audio]
 # sounddevice device identifier. Empty = system default input.
@@ -21,8 +25,10 @@ sample_rate = 16000
 num_threads = 4
 
 [inject]
-# "paste" = clipboard + Cmd+V via pynput (needs Accessibility permission)
-# "applescript" = AppleScript Cmd+V (no Accessibility permission needed, slower)
+# "paste"       — clipboard + Cmd+V via pynput (recommended)
+# "applescript" — clipboard + Cmd+V via osascript System Events (slower)
+# Both methods require Accessibility permission for the running process;
+# there is no permission-free way to paste on modern macOS.
 method = "paste"
 restore_clipboard = true
 paste_delay = 0.08

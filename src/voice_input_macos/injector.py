@@ -1,7 +1,14 @@
 """Inject text into the currently focused window on macOS.
 
-Primary method: clipboard + Cmd+V via pynput (requires Accessibility permission).
-Fallback: AppleScript Cmd+V (slower, no Accessibility needed for paste itself).
+Both paths require the running process (or its parent terminal) to be
+granted Accessibility permission:
+
+  - "paste":       pynput posts CGEvents directly.
+  - "applescript": `osascript` drives System Events, which itself
+                    needs Accessibility (+ Automation on newer macOS)
+                    to synthesise keystrokes into other apps.
+
+There is no truly permission-free way to paste on modern macOS.
 """
 from __future__ import annotations
 
@@ -65,9 +72,17 @@ def _pynput_paste(
 
     time.sleep(paste_delay)
 
+    # Release any modifier the user may still be holding from the PTT
+    # chord (option / shift / ctrl / cmd, both sides). Otherwise Cmd+V
+    # becomes Cmd+Shift+V etc. and the target app sees the wrong combo.
+    for mod in (Key.shift, Key.shift_r, Key.alt, Key.alt_r,
+                Key.ctrl, Key.ctrl_r, Key.cmd, Key.cmd_r):
+        try:
+            _keyboard.release(mod)
+        except Exception:
+            pass
+
     try:
-        # Ensure no sticky modifier
-        _keyboard.release(Key.cmd)
         with _keyboard.pressed(Key.cmd):
             _keyboard.press('v')
             _keyboard.release('v')

@@ -22,7 +22,7 @@ from voice_input_macos import config as cfg_mod
 from voice_input_macos.accessibility import check_accessibility, prompt_accessibility
 from voice_input_macos.floating_window import FloatingWindow
 from voice_input_macos.hotkey import HotkeyController, State
-from voice_input_macos.paths import CONFIG_FILE, LOG_DIR, LOG_FILE, MODEL_DIR
+from voice_input_macos.paths import CONFIG_FILE, LOG_DIR, LOG_FILE
 from voice_input_common.audio import Recorder, RecorderError, list_input_devices
 from voice_input_common.stt import ParaformerStt, SttError
 
@@ -66,6 +66,7 @@ class _MenuBar(Foundation.NSObject):
 
     _recorder = objc.ivar(type=objc._C_ID)
     _devices = objc.ivar(type=objc._C_ID)
+    _device_items = objc.ivar(type=objc._C_ID)
     _menu = objc.ivar(type=objc._C_ID)
     _device_cfg = objc.ivar(type=objc._C_ID)
     _log = objc.ivar(type=objc._C_ID)
@@ -75,6 +76,7 @@ class _MenuBar(Foundation.NSObject):
         if self is not None:
             self._recorder = None
             self._devices = []
+            self._device_items = []
             self._menu = None
             self._device_cfg = ""
             self._log = None
@@ -107,14 +109,15 @@ class _MenuBar(Foundation.NSObject):
 
         self._devices = devices
         self._device_cfg = current
-        for i, d in enumerate(devices):
-            title = f"  {d['name']}"
+        self._device_items = []
+        for d in devices:
             item = AppKit.NSMenuItem.alloc().initWithTitle_action_keyEquivalent_(
-                title, objc.selector(self._selectDevice_, signature=b"v@:@"), ""
+                d["name"], objc.selector(self._selectDevice_, signature=b"v@:@"), ""
             )
             item.setTag_(d["index"])
             item.setTarget_(self)
             self._menu.addItem_(item)
+            self._device_items.append(item)
 
         self._checkCurrentDevice()
 
@@ -141,7 +144,7 @@ class _MenuBar(Foundation.NSObject):
         self._status_item.setMenu_(self._menu)
 
     def _selectDevice_(self, sender):
-        name = str(sender.title()).strip()
+        name = str(sender.title())
         if self._recorder is not None:
             self._recorder.device_cfg = name
         self._device_cfg = name
@@ -150,16 +153,13 @@ class _MenuBar(Foundation.NSObject):
         self._checkCurrentDevice()
 
     def _checkCurrentDevice(self):
-        """Add ✓ to the current device menu item."""
+        """Add ✓ to the current device menu item (match by stored item list)."""
         current = (self._device_cfg or "").strip().lower()
-        items = self._menu.itemArray()
-        for item in items:
-            title = str(item.title())
-            # Only check device items (they have leading spaces)
-            if not title.startswith("  "):
-                continue
-            name = title.strip().lower()
-            item.setState_(AppKit.NSControlStateValueOn if name == current else AppKit.NSControlStateValueOff)
+        for item in self._device_items:
+            name = str(item.title()).strip().lower()
+            on = AppKit.NSControlStateValueOn
+            off = AppKit.NSControlStateValueOff
+            item.setState_(on if name == current else off)
 
     def _requestAccessibility_(self, sender):
         prompt_accessibility()
@@ -184,16 +184,35 @@ class _StateBridge(Foundation.NSObject):
         return self
 
     def onStateChange_(self, state_name):
-        state = State(str(state_name))
+        s = str(state_name)
         win = self._window
         if win is None:
             return
+        # Preview of the recognised text is sent as "text:<content>".
+        if s.startswith("text:"):
+            preview = s[5:]
+            if preview:
+                preview = preview[:30] + ("…" if len(preview) > 30 else "")
+                win.show(f"✓ {preview}", recording=False)
+                # Auto-hide after ~1s so the user sees confirmation.
+                Foundation.NSTimer.scheduledTimerWithTimeInterval_target_selector_userInfo_repeats_(
+                    1.0, self, objc.selector(self._hide_, signature=b"v@:@"), None, False
+                )
+            return
+        try:
+            state = State(s)
+        except ValueError:
+            return
         if state is State.RECORDING:
-            win.show("录音中...", recording=True)
+            win.show("录音中…", recording=True)
         elif state is State.PROCESSING:
-            win.update_status("识别中...", recording=False)
+            win.update_status("识别中…", recording=False)
         elif state is State.IDLE:
             win.hide()
+
+    def _hide_(self, _timer):
+        if self._window is not None:
+            self._window.hide()
 
 
 # ── main ──────────────────────────────────────────────────────
@@ -214,12 +233,21 @@ def main() -> int:
     # ── accessibility ─────────────────────────────────────────
     has_acc = check_accessibility()
     inject_method = cfg.inject.method
-    if inject_method == "paste" and not has_acc:
-        log.info("Accessibility not granted — prompting & falling back to applescript")
+    if not has_acc:
+        log.warning(
+            "Accessibility permission not granted — neither 'paste' nor "
+            "'applescript' will work until you enable it in "
+            "System Settings > Privacy & Security > Accessibility."
+        )
         prompt_accessibility()
         has_acc = check_accessibility()
         if not has_acc:
-            inject_method = "applescript"
+            print(
+                "WARNING: Accessibility permission missing. Hotkey capture "
+                "and paste will fail. Enable it for your terminal "
+                "(or packaged app) and re-run.",
+                file=sys.stderr,
+            )
 
     # ── STT + recorder ────────────────────────────────────────
     try:
@@ -273,6 +301,13 @@ def main() -> int:
             False,
         )
 
+    def _on_text(text: str) -> None:
+        bridge.performSelectorOnMainThread_withObject_waitUntilDone_(
+            objc.selector(bridge.onStateChange_, signature=b"v@:@"),
+            Foundation.NSString.stringWithString_(f"text:{text}"),
+            False,
+        )
+
     controller = HotkeyController(
         ptt_key=cfg.hotkey.ptt,
         recorder=recorder,
@@ -282,6 +317,7 @@ def main() -> int:
         paste_delay=cfg.inject.paste_delay,
         on_status=_on_status,
         on_state_change=_on_state_change,
+        on_text=_on_text,
     )
 
     # ── signal handling ───────────────────────────────────────

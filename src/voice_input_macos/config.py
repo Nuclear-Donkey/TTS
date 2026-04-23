@@ -14,8 +14,12 @@ log = logging.getLogger(__name__)
 
 @dataclass
 class HotkeyConfig:
-    # pynput key name: "caps_lock", "right_option", "left_option", "f9", etc.
-    ptt: str = "caps_lock"
+    # pynput key name: "right_option", "left_option", "f9", etc.
+    # NOTE: "caps_lock" is a toggle on macOS — pynput won't deliver a
+    # matching release when you let go, so press-and-hold PTT breaks.
+    # Disable Caps Lock toggle in System Settings > Keyboard first
+    # if you really want to use it.
+    ptt: str = "right_option"
 
 
 @dataclass
