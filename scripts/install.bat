@@ -51,15 +51,33 @@ if "!PY_CMD!"=="" (
 )
 
 REM ---- 2. venv ----
-if not exist .venv (
-    echo [2/5] Creating .venv ...
+REM If an existing .venv uses a different Python version than the one
+REM we just picked, it will drag us into from-source PyQt6 builds.
+REM Rebuild when the versions don't match.
+set "VENV_PY=.venv\Scripts\python"
+set "REBUILD_VENV=0"
+
+if exist .venv (
+    for /f "usebackq tokens=2" %%v in (`%VENV_PY% --version 2^>^&1`) do set "VENV_VER=%%v"
+    for /f "usebackq tokens=2" %%v in (`%PY_CMD% --version 2^>^&1`) do set "HOST_VER=%%v"
+    echo      existing .venv Python: !VENV_VER!
+    echo      host Python:           !HOST_VER!
+    if not "!VENV_VER!"=="!HOST_VER!" (
+        echo      versions differ - rebuilding .venv
+        set "REBUILD_VENV=1"
+    )
+) else (
+    set "REBUILD_VENV=1"
+)
+
+if "!REBUILD_VENV!"=="1" (
+    echo [2/5] Creating .venv with %PY_CMD% ...
+    if exist .venv rmdir /s /q .venv
     %PY_CMD% -m venv .venv
     if errorlevel 1 goto :fail
 ) else (
     echo [2/5] Reusing existing .venv
 )
-
-set "VENV_PY=.venv\Scripts\python"
 
 REM ---- 3. Runtime + build deps in one shot ----
 echo [3/5] Installing dependencies ^(this takes a few minutes^) ...
