@@ -35,7 +35,8 @@ datas += collect_data_files("sherpa_onnx")
 
 hiddenimports = []
 hiddenimports += collect_submodules("sherpa_onnx")
-hiddenimports += ["PyQt6.sip"]
+# PySide6 uses shiboken6 for its C++ bindings
+hiddenimports += ["shiboken6"]
 
 a = Analysis(
     [str(PROJECT / "src" / "voice_input_win" / "__main__.py")],

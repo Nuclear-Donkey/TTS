@@ -16,8 +16,8 @@ import os
 import sys
 import threading
 
-from PyQt6.QtCore import QObject, QTimer, pyqtSignal, pyqtSlot
-from PyQt6.QtWidgets import QApplication, QMessageBox, QSystemTrayIcon
+from PySide6.QtCore import QObject, QTimer, Signal, Slot
+from PySide6.QtWidgets import QApplication, QMessageBox, QSystemTrayIcon
 
 from voice_input_win import config as cfg_mod
 from voice_input_win.first_run import run_if_needed
@@ -53,9 +53,9 @@ def _setup_logging(debug: bool) -> None:
 class _StateBridge(QObject):
     """Signals emitted from hotkey thread, handled on main thread."""
 
-    state_changed = pyqtSignal(str)   # "recording" / "processing" / "idle"
-    text_ready = pyqtSignal(str)      # recognised text (post-paste)
-    error_occurred = pyqtSignal(str)  # user-facing error message
+    state_changed = Signal(str)   # "recording" / "processing" / "idle"
+    text_ready = Signal(str)      # recognised text (post-paste)
+    error_occurred = Signal(str)  # user-facing error message
 
 
 # ── first-run check ─────────────────────────────────────────────────
@@ -137,7 +137,7 @@ def main() -> int:
     window = FloatingWindow()
     bridge = _StateBridge()
 
-    @pyqtSlot(str)
+    @Slot(str)
     def _on_state(name: str) -> None:
         if name == State.RECORDING.value:
             window.show_recording()
@@ -145,11 +145,11 @@ def main() -> int:
             window.show_processing()
         # IDLE: let text_ready / error_occurred handle final display.
 
-    @pyqtSlot(str)
+    @Slot(str)
     def _on_text(text: str) -> None:
         window.show_success(text)
 
-    @pyqtSlot(str)
+    @Slot(str)
     def _on_err(msg: str) -> None:
         window.show_error(msg)
 

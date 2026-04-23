@@ -4,7 +4,7 @@ REM  voice-input-win 一键安装 + 编译 + 快捷方式
 REM
 REM  只需双击本文件一次,自动做完:
 REM    1. 检查 Python (3.10 ~ 3.13)
-REM    2. 建 .venv 并装所有运行时依赖 (sherpa-onnx + PyQt6 + ...)
+REM    2. 建 .venv 并装所有运行时依赖 (sherpa-onnx + PySide6 + ...)
 REM    3. 下载识别模型 (~80MB)
 REM    4. 装 PyInstaller 并编译出 dist\voice-input.exe
 REM    5. 在桌面创建快捷方式
@@ -52,8 +52,7 @@ if "!PY_CMD!"=="" (
 
 REM ---- 2. venv ----
 REM If an existing .venv uses a different Python version than the one
-REM we just picked, it will drag us into from-source PyQt6 builds.
-REM Rebuild when the versions don't match.
+REM we just picked, we rebuild to stay in sync with the host.
 set "VENV_PY=.venv\Scripts\python"
 set "REBUILD_VENV=0"
 
@@ -84,15 +83,16 @@ echo [3/5] Installing dependencies ^(this takes a few minutes^) ...
 %VENV_PY% -m pip install --upgrade pip wheel --quiet
 if errorlevel 1 goto :fail
 
-REM Runtime + build deps combined. PyQt6 pinned to 6.7.x so wheels
-REM resolve on Python 3.13 (6.11 has no 3.13 wheels).
-%VENV_PY% -m pip install ^
+REM Runtime + build deps combined. PySide6 (official Qt for Python)
+REM has reliable wheels across Python 3.9-3.13, unlike PyQt6 which
+REM sometimes falls back to from-source builds needing the Qt SDK.
+%VENV_PY% -m pip install --only-binary=:all: ^
     sherpa-onnx ^
     numpy ^
     sounddevice ^
     keyboard ^
     pyperclip ^
-    "PyQt6>=6.6,<6.8" ^
+    "PySide6>=6.6" ^
     Pillow ^
     pyinstaller ^
     pywin32 ^

@@ -20,9 +20,9 @@ import subprocess
 from pathlib import Path
 from typing import Callable
 
-from PyQt6.QtCore import QObject, Qt
-from PyQt6.QtGui import QAction, QActionGroup, QIcon, QPainter, QPixmap, QColor, QBrush
-from PyQt6.QtWidgets import QMenu, QSystemTrayIcon, QApplication
+from PySide6.QtCore import QObject, Qt
+from PySide6.QtGui import QAction, QActionGroup, QIcon, QPainter, QPixmap, QColor, QBrush
+from PySide6.QtWidgets import QMenu, QSystemTrayIcon, QApplication
 
 from voice_input_win.paths import CONFIG_FILE, LOG_DIR
 

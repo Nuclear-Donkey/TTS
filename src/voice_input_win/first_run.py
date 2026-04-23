@@ -10,8 +10,8 @@ import os
 import sys
 from pathlib import Path
 
-from PyQt6.QtCore import QObject, QThread, pyqtSignal
-from PyQt6.QtWidgets import QProgressDialog, QMessageBox
+from PySide6.QtCore import QObject, QThread, Signal
+from PySide6.QtWidgets import QProgressDialog, QMessageBox
 
 from voice_input_win.model_downloader import (
     download_and_extract,
@@ -24,9 +24,9 @@ log = logging.getLogger(__name__)
 # ── model download ─────────────────────────────────────────────────
 
 class _DownloadWorker(QObject):
-    progress = pyqtSignal(int, int)   # got, total
-    finished = pyqtSignal()
-    failed = pyqtSignal(str)
+    progress = Signal(int, int)   # got, total
+    finished = Signal()
+    failed = Signal(str)
 
     def __init__(self, dest: Path, variant: str = "small") -> None:
         super().__init__()
