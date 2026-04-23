@@ -2,13 +2,30 @@
 
 按住 **Right Alt** 说话，松开后识别出的中文自动粘贴到当前光标位置。Claude Code CLI、PowerShell、Edge、VSCode、Office 全通用。本地离线识别（Paraformer-zh，~80 MB）。
 
-## 给小白用户（直接用 .exe）
+## 两种使用方式
+
+### A. 官方 Release 下载 exe（推荐给纯小白）
 
 1. 从 [Releases](../../releases) 下载最新 `voice-input.exe`
 2. **双击运行**
-3. 首次启动：自动弹进度条下载识别模型（~80 MB，一次即可），完成后在桌面生成 `voice-input.lnk` 快捷方式
+3. 首次启动：自动弹进度条下载识别模型（~80 MB），完成后桌面生成快捷方式
 4. 右下角托盘出现麦克风图标 ✅
-5. 光标落到任何文本框，按住 **Right Alt** 说话 → 松开 → 文字自动粘贴
+
+### B. 源码一键安装（如果 Releases 没有你要的版本）
+
+前提：装过 **Python 3.12**（[官网下载](https://www.python.org/downloads/release/python-3127/)，安装勾 "Add to PATH"）。
+
+```bat
+git clone https://github.com/Nuclear-Donkey/TTS.git
+cd TTS
+scripts\install.bat
+```
+
+`install.bat` 自动：装 venv + 所有依赖 + 下模型 + 编译 exe + 桌面快捷方式。大约 5~10 分钟。完成后只用桌面图标启动，不再需要任何命令行。
+
+### 启动后用法
+
+光标落到任何文本框，按住 **Right Alt** 说话 → 松开 → 文字自动粘贴。
 
 ### 界面
 
