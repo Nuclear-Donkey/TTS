@@ -27,14 +27,16 @@ win = [
     "sounddevice>=0.4.7",
     "keyboard>=0.13.5",
     "pyperclip>=1.9.0",
-    "PyQt6>=6.6",
+    # Pin to 6.7.x: 6.11 has no wheels for Python 3.13 and falls back
+    # to a from-source build that needs Qt SDK / qmake.
+    "PyQt6>=6.6,<6.8",
 ]
 # Build-only deps for producing the single-file .exe.
 win-build = [
     "sounddevice>=0.4.7",
     "keyboard>=0.13.5",
     "pyperclip>=1.9.0",
-    "PyQt6>=6.6",
+    "PyQt6>=6.6,<6.8",
     "pyinstaller>=6.0",
     "Pillow>=10.0",
     "pywin32>=306",

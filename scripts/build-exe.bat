@@ -15,7 +15,9 @@ if not exist .venv (
 echo === Installing build-time deps ===
 .venv\Scripts\python -m pip install --upgrade pip --quiet
 if errorlevel 1 goto :err
-.venv\Scripts\python -m pip install pyinstaller PyQt6 Pillow --quiet
+REM Pin PyQt6 to 6.7.x — newer versions (6.11) have no wheels for Python 3.13
+REM and fall back to a from-source build that requires Qt SDK / qmake.
+.venv\Scripts\python -m pip install pyinstaller "PyQt6>=6.6,<6.8" Pillow --quiet
 if errorlevel 1 goto :err
 
 echo === Regenerating app icon ===
