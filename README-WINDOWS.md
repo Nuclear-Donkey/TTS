@@ -1,164 +1,108 @@
-# voice-input-win — Windows 语音输入
+# voice-input for Windows
 
-按住 Right Alt 说话，松开后识别出的中文自动粘贴到当前光标位置。Claude Code CLI、PowerShell、Edge、VSCode、Office 全通用。本地离线识别（Paraformer-zh）。
+按住 **Right Alt** 说话，松开后识别出的中文自动粘贴到当前光标位置。Claude Code CLI、PowerShell、Edge、VSCode、Office 全通用。本地离线识别（Paraformer-zh，~80 MB）。
 
-## 系统要求
+## 给小白用户（直接用 .exe）
 
-- Windows 10 或 Windows 11
-- Python 3.10+ （[官网下载](https://www.python.org/downloads/)，安装时勾选"Add Python to PATH"）
-- 可用麦克风
-- 网络（首次下载模型 ~80 MB）
-- 管理员权限（运行时；安装时不需要）
+1. 从 [Releases](../../releases) 下载最新 `voice-input.exe`
+2. **双击运行**
+3. 首次启动：自动弹进度条下载识别模型（~80 MB，一次即可），完成后在桌面生成 `voice-input.lnk` 快捷方式
+4. 右下角托盘出现麦克风图标 ✅
+5. 光标落到任何文本框，按住 **Right Alt** 说话 → 松开 → 文字自动粘贴
 
-## 安装
+### 界面
 
-解压本目录到任意位置（例如 `C:\voice-input\`），然后：
+- **屏幕顶部**会出现一个毛玻璃悬浮小条显示状态：
+  - 🔴 `录音中…`
+  - 🟡 `识别中…`
+  - 🟡 `✓ 你刚说的话`（1 秒后自动消失）
+- **右下角托盘**可点开菜单：切换麦克风、打开配置、打开日志、退出
 
-```bat
-cd C:\voice-input
-scripts\setup.bat
-```
+### 系统要求
 
-`setup.bat` 会做完：
-1. 检查 Python
-2. 创建 `.venv\`
-3. pip 装 sherpa-onnx、sounddevice、keyboard、pyperclip
-4. 下载 Paraformer-zh small 模型（~80 MB）到 `%LOCALAPPDATA%\voice-input\models\`
-5. 拷默认配置到 `%APPDATA%\voice-input\config.toml`
+- Windows 10 / 11
+- 有麦克风
+- 首次启动要联网（下载 80MB 模型）；之后完全离线
 
-## 启动
+### 推荐：以管理员身份运行
 
-**推荐以管理员身份启动**（避免某些 UAC 窗口拦截热键）：
+部分提权窗口（任务管理器、某些游戏启动器）会吞掉热键。右键快捷方式 → 属性 → 兼容性 → 勾"以管理员身份运行"即可永久解决。
 
-```bat
-scripts\run-as-admin.bat
-```
+## 常见问题
 
-或者免管理员（大多数应用可用）：
+**热键按了没反应**
+- 检查右下角托盘图标是否还在（程序是否在跑）
+- 以管理员身份重新启动
+- 打开托盘右键菜单 → "打开日志文件夹"，看 `service.log` 有无报错
 
-```bat
-scripts\run.bat
-```
+**识别文字没粘进来**
+- 当前窗口是否支持 Ctrl+V？先在记事本里试
+- 改配置文件里 `paste_delay = 0.1` 再重启
 
-启动后终端会显示：
+**识别结果不准 / 出现无意义字**
+- 麦克风音量低：日志里看 `(silent RMS=xxx)`。系统设置 → 声音 → 输入，选对设备且拉到 80%+
+- 换更准的完整版模型：删除 `%LOCALAPPDATA%\voice-input\models\paraformer-zh`，用高级模式手动下载 217MB full 版
 
-```
-============================================================
-  voice-input for Windows
-============================================================
-  hotkey:       hold  [right alt]  to talk
-  model dir:    C:\Users\you\AppData\Local\voice-input\models\paraformer-zh
-  audio device: (system default)
-  inject:       paste
-  log:          C:\Users\you\AppData\Local\voice-input\logs\service.log
-  config:       C:\Users\you\AppData\Roaming\voice-input\config.toml
-============================================================
-
-  ready — hold [right alt] to speak
-```
-
-## 使用
-
-1. 光标落到任何文本框（终端、浏览器、VSCode、Word 都行）
-2. **按住 Right Alt** 说一句中文
-3. **松开 Right Alt**
-4. 约 100 ms 后文字出现在光标处
-
-终端底部会滚动显示状态：
-- `● recording…` — 正在收音
-- `⏳ recognizing…` — 跑 STT
-- `✓ 你刚说的话` — 已粘贴成功
-- `✗ ...` / `(silent RMS=xxx)` — 错误或静音保护
-
-## 配置
-
-编辑 `%APPDATA%\voice-input\config.toml`：
+**想换 PTT 键**
+托盘 → 打开配置文件，改 `[hotkey] ptt`，保存后右键托盘退出、再启动。
 
 ```toml
 [hotkey]
-ptt = "right alt"        # 推荐，也可以 "caps lock" / "f9" / "right ctrl"
-
-[audio]
-device = ""              # 空 = 系统默认；也可填设备索引或名字子串
-
-[stt]
-num_threads = 4
-
-[inject]
-restore_clipboard = true
-paste_delay = 0.05
+ptt = "right alt"    # 可选：caps lock / right ctrl / f9 / pause / scroll lock
 ```
 
-改完**重启程序**生效。
+**想开机自启**
+右键桌面快捷方式 → 复制 → 按 `Win+R` 输入 `shell:startup` → 把快捷方式粘进去
 
-## 排错
+## 彻底卸载
 
-### 热键没反应
-- 确认是**管理员模式**启动的（`run-as-admin.bat`）
-- 任务管理器里看有没有 `python.exe`
-- 看 `%LOCALAPPDATA%\voice-input\logs\service.log` 日志
+1. 右键托盘 → 退出
+2. 删除 `voice-input.exe` 和桌面/开始菜单里的快捷方式
+3. 删除以下两个文件夹（可选，含模型和配置）：
+   - `%LOCALAPPDATA%\voice-input\`
+   - `%APPDATA%\voice-input\`
 
-### 文字没出现但日志显示已识别
-- 当前窗口支持 Ctrl+V 吗？试试在记事本里
-- 改配置 `paste_delay = 0.1` 重启
+---
 
-### 识别质量差 / 出现"没有没有"类乱码
-- **麦克风信号太低** — 日志会显示 `(silent RMS=xxx)`
-- 系统设置 → 声音 → 输入，选对正确的麦克风，把音量拉到 80%+
-- 换用 77MB small 模型的话可以切到 217MB full 版：
-  ```bat
-  .venv\Scripts\python scripts\download_model_win.py --force
-  ```
+## 开发者：从源码构建 .exe
 
-### 想换 PTT 键
-改 `config.toml` 里 `[hotkey]` 的 `ptt`。常用键名：`right alt` / `left alt` / `caps lock` / `right ctrl` / `f9` / `pause` / `scroll lock`
-
-### 看设备列表
 ```bat
-.venv\Scripts\python -c "import sounddevice; print(sounddevice.query_devices())"
+git clone <repo> && cd TTS
+scripts\setup.bat        :: 建 venv + 装运行时依赖
+scripts\build-exe.bat    :: 装 PyInstaller/PyQt6/Pillow 并编译,输出 dist\voice-input.exe
 ```
 
-### 完整卸载
-删除项目目录，以及：
-- `%LOCALAPPDATA%\voice-input\` — 模型 + 日志
-- `%APPDATA%\voice-input\` — 配置
+构建配置在 `voice-input-win.spec`。单文件 exe 约 180–220 MB（含 Qt + sherpa-onnx 运行时）。
 
-## 目录布局
+### 直接从源码运行（开发用）
 
-```
-voice-input\
-├── src\voice_input_win\
-│   ├── __main__.py         # 入口
-│   ├── config.py           # TOML 配置
-│   ├── paths.py            # Windows 路径
-│   ├── recorder.py         # sounddevice 录音
-│   ├── stt.py              # sherpa-onnx Paraformer
-│   ├── hotkey.py           # keyboard PTT 监听 + 状态机
-│   └── injector.py         # pyperclip + Ctrl+V 粘贴
-├── scripts\
-│   ├── setup.bat           # 一键安装
-│   ├── run-as-admin.bat    # 管理员启动
-│   ├── run.bat             # 普通启动
-│   └── download_model_win.py
-├── resources\
-│   └── default-config-win.toml
-└── README-WINDOWS.md
+```bat
+scripts\setup.bat
+.venv\Scripts\python -m pip install PyQt6
+.venv\Scripts\python -m voice_input_win
 ```
 
-## 性能（实测）
+### 目录布局
 
-| 指标 | 值 |
-|------|----|
-| 内存占用 | ~450 MB（含模型） |
-| STT 延迟（3s 音频） | ~50 ms |
-| 端到端延迟（松键→上屏） | ~150 ms |
-| 空闲 CPU | < 1% |
+```
+src\voice_input_win\
+  ├── __main__.py           # Qt 入口
+  ├── floating_window.py    # PyQt6 毛玻璃浮窗
+  ├── tray.py               # 系统托盘
+  ├── first_run.py          # 首次启动:下载模型+创建快捷方式
+  ├── model_downloader.py   # 模型下载(可导入,带进度回调)
+  ├── hotkey.py             # keyboard 库 + 状态机
+  ├── injector.py           # pyperclip + Ctrl+V 粘贴
+  ├── recorder.py           # sounddevice 录音
+  ├── stt.py                # sherpa-onnx Paraformer
+  ├── config.py / paths.py  # TOML 配置 + Windows 路径
+```
 
-## 技术说明
+## 架构说明
 
-不是 Windows IME（TSF 太复杂、C++/COM），而是"全局热键 + 剪贴板粘贴"。优点是所有应用兼容，缺点是会短暂占用剪贴板（程序会自动恢复原内容）。
+不是 Windows IME（TSF 太复杂），而是"全局热键 + 剪贴板 Ctrl+V"。优点：所有应用兼容。缺点：短暂占用剪贴板（程序会异步恢复原内容）。
 
-STT 用 Paraformer-zh（达摩院），通过 sherpa-onnx 纯 ONNX Runtime 推理，CPU 即可实时。
+STT 走 sherpa-onnx ONNX Runtime 推理，CPU 即可实时。UI 走 PyQt6（毛玻璃浮窗 + 系统托盘）。进程模型：Qt 主线程跑 UI，`keyboard` 库后台线程监听热键，识别在独立 worker 线程，状态变化通过 Qt signal 跨线程分发。
 
 ## 许可
 
