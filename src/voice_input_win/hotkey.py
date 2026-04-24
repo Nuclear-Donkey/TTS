@@ -33,6 +33,25 @@ SILENCE_RMS_THRESHOLD = 60.0
 DEBUG_WAV_ON_FAILURE = LOG_DIR
 
 
+def _force_caps_lock_off() -> None:
+    """Turn off the Caps Lock toggle state if currently on (Windows only).
+
+    Even with suppress=True some Windows builds still flip the internal
+    toggle for one frame. This is a cheap no-op on non-Windows.
+    """
+    try:
+        import ctypes
+        user32 = ctypes.windll.user32  # type: ignore[attr-defined]
+        VK_CAPITAL = 0x14
+        # GetKeyState returns state with bit 0 = toggle
+        if user32.GetKeyState(VK_CAPITAL) & 1:
+            KEYEVENTF_KEYUP = 0x0002
+            user32.keybd_event(VK_CAPITAL, 0, 0, 0)
+            user32.keybd_event(VK_CAPITAL, 0, KEYEVENTF_KEYUP, 0)
+    except Exception:
+        pass
+
+
 class State(enum.Enum):
     IDLE = "idle"
     RECORDING = "recording"
@@ -51,16 +70,20 @@ class HotkeyController:
         *,
         restore_clipboard: bool = True,
         paste_delay: float = 0.05,
+        suppress_caps_lock_toggle: bool = True,
         on_status: StatusCallback | None = None,
         on_state_change: Callable[[State], None] | None = None,
         on_text: Callable[[str], None] | None = None,
         on_error: Callable[[str], None] | None = None,
     ) -> None:
-        self._ptt_key = ptt_key.lower()
+        self._ptt_key = ptt_key.lower().strip()
         self._recorder = recorder
         self._stt = stt
         self._restore_clipboard = restore_clipboard
         self._paste_delay = paste_delay
+        self._suppress_caps = (
+            suppress_caps_lock_toggle and self._ptt_key == "caps lock"
+        )
         self._on_status = on_status or (lambda s: None)
         self._on_state_change = on_state_change or (lambda s: None)
         self._on_text = on_text or (lambda s: None)
@@ -70,6 +93,7 @@ class HotkeyController:
         self._rec_started_at = 0.0
         self._lock = threading.Lock()
         self._stop_event = threading.Event()
+        self._hook_handle = None  # for suppressed caps-lock hook
 
     def _status(self, msg: str) -> None:
         log.info("status: %s", msg)
@@ -92,10 +116,23 @@ class HotkeyController:
 
     def run(self) -> None:
         """Register hotkey hooks and block until stop() is called."""
-        log.info("registering hotkey: press-and-hold %s", self._ptt_key)
+        log.info(
+            "registering hotkey: press-and-hold %s (suppress=%s)",
+            self._ptt_key, self._suppress_caps,
+        )
         try:
-            keyboard.on_press_key(self._ptt_key, self._on_press, suppress=False)
-            keyboard.on_release_key(self._ptt_key, self._on_release, suppress=False)
+            if self._suppress_caps:
+                # hook_key with suppress=True swallows the key event so
+                # Windows never toggles the Caps Lock LED/state. We then
+                # dispatch press/release ourselves based on event.event_type.
+                self._hook_handle = keyboard.hook_key(
+                    self._ptt_key, self._on_caps_event, suppress=True,
+                )
+                # Also reset caps-lock state in case it was already on.
+                _force_caps_lock_off()
+            else:
+                keyboard.on_press_key(self._ptt_key, self._on_press, suppress=False)
+                keyboard.on_release_key(self._ptt_key, self._on_release, suppress=False)
         except Exception as e:
             raise RuntimeError(
                 f"could not register hotkey {self._ptt_key!r}. "
@@ -112,6 +149,28 @@ class HotkeyController:
         self._stop_event.set()
 
     # --- event handlers (run on keyboard lib's listener thread) -------
+
+    def _on_caps_event(self, evt) -> None:
+        """Unified handler for suppressed caps-lock hook.
+
+        `keyboard.hook_key` fires on every low-level event, including
+        key-repeat while held. We fire _on_press only on the *first*
+        down (state transition IDLE → RECORDING), and _on_release only
+        on actual key-up. Repeats while held are ignored.
+        """
+        try:
+            kind = getattr(evt, "event_type", None)
+        except Exception:
+            return
+        if kind == "down":
+            with self._lock:
+                if self._state is not State.IDLE:
+                    return  # ignore auto-repeat
+            self._on_press(evt)
+        elif kind == "up":
+            self._on_release(evt)
+            # Ensure the OS toggle state stays off
+            _force_caps_lock_off()
 
     def _on_press(self, _evt) -> None:
         with self._lock:

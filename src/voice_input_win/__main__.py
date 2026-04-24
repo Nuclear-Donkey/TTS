@@ -185,6 +185,7 @@ def main() -> int:
         stt=stt,
         restore_clipboard=cfg.inject.restore_clipboard,
         paste_delay=cfg.inject.paste_delay,
+        suppress_caps_lock_toggle=cfg.hotkey.suppress_caps_lock_toggle,
         on_status=lambda s: log.debug("status: %s", s),
         on_state_change=lambda st: bridge.state_changed.emit(st.value),
         on_text=lambda t: bridge.text_ready.emit(t),

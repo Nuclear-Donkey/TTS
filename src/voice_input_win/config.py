@@ -20,8 +20,11 @@ log = logging.getLogger(__name__)
 
 @dataclass
 class HotkeyConfig:
-    # Any keyboard lib key name. Common: "right alt", "caps lock", "f9", "right ctrl"
-    ptt: str = "right alt"
+    # Any keyboard lib key name. Common: "caps lock", "right alt", "f9", "right ctrl"
+    ptt: str = "caps lock"
+    # When ptt == "caps lock", swallow the toggle so the LED/state doesn't
+    # flip every time the user talks.
+    suppress_caps_lock_toggle: bool = True
 
 
 @dataclass

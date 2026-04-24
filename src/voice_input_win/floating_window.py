@@ -1,90 +1,243 @@
-"""Frosted-glass floating status panel for Windows voice input.
+"""Polished floating status panel for Windows voice input (PySide6).
 
-Top-center borderless panel, always on top, click-through (WS_EX_TRANSPARENT),
-draws a status dot + text over a translucent rounded rectangle.
-
-Three visual states mirror the macOS panel:
-    RECORDING   — red dot, text "录音中…"
-    PROCESSING  — amber dot, text "识别中…"
-    SUCCESS     — amber dot, text "✓ <preview>"  auto-hide after 1s
+Visual design:
+    - Pill-shaped, 260 × 56, top-center, always on top, click-through.
+    - Vertical gradient (deep blue → lighter blue) in recording state;
+      amber gradient in processing / success.
+    - Thin 1px light border, soft drop shadow (layered via QGraphicsEffect).
+    - App icon on the left (uses bundled voice-input.ico), pulsing dot
+      overlay while recording.
+    - 180ms opacity fade on show / hide.
 """
 from __future__ import annotations
 
 import logging
+import sys
+from pathlib import Path
 
-from PySide6.QtCore import Qt, QTimer, QRectF, QPoint
-from PySide6.QtGui import QColor, QPainter, QBrush, QFont, QFontMetrics, QGuiApplication
+from PySide6.QtCore import (
+    QEasingCurve, QPoint, QPropertyAnimation, QRectF, QSize, Qt, QTimer,
+)
+from PySide6.QtGui import (
+    QBrush, QColor, QFont, QFontMetrics, QGuiApplication, QIcon, QLinearGradient,
+    QPainter, QPen, QPixmap,
+)
 from PySide6.QtWidgets import QWidget
 
 log = logging.getLogger(__name__)
 
-PANEL_WIDTH = 240
-PANEL_HEIGHT = 52
-CORNER_RADIUS = 14
+PANEL_WIDTH = 260
+PANEL_HEIGHT = 56
+CORNER_RADIUS = 18
+ICON_SIZE = 28
+DOT_SIZE = 10
+FADE_MS = 180
 
-_BG = QColor(28, 28, 30, 220)        # near-black translucent
-_TEXT = QColor(255, 255, 255, 235)
-_DOT_RECORD = QColor(242, 84, 84)    # red
-_DOT_PROCESS = QColor(255, 184, 51)  # amber
+# ── palettes (match the app icon's dodger-blue scheme) ──────────────
+_REC_TOP = QColor(79, 166, 255, 235)    # vivid blue top
+_REC_BOT = QColor(30, 120, 215, 235)    # deeper blue bottom
+_PROC_TOP = QColor(255, 196, 87, 235)   # warm amber top
+_PROC_BOT = QColor(235, 150, 45, 235)   # deeper amber bottom
+_ERR_TOP = QColor(255, 110, 110, 235)
+_ERR_BOT = QColor(215, 60, 60, 235)
+_BORDER = QColor(255, 255, 255, 70)
+_TEXT = QColor(255, 255, 255, 240)
+_SHADOW = QColor(0, 0, 0, 140)
+
+
+def _bundled_icon() -> QIcon | None:
+    """Find the packaged .ico (PyInstaller bundle or source tree)."""
+    candidates = []
+    if getattr(sys, "frozen", False):
+        candidates.append(
+            Path(sys._MEIPASS) / "resources" / "icons" / "voice-input.ico"  # type: ignore[attr-defined]
+        )
+    here = Path(__file__).resolve()
+    candidates.append(here.parents[2] / "resources" / "icons" / "voice-input.ico")
+    for c in candidates:
+        if c.exists():
+            return QIcon(str(c))
+    return None
 
 
 class FloatingWindow(QWidget):
     def __init__(self) -> None:
         super().__init__()
         self._text = ""
-        self._dot_color = _DOT_RECORD
+        self._state = "recording"  # recording | processing | error
+        self._icon = _bundled_icon()
+        self._icon_pix = (
+            self._icon.pixmap(QSize(ICON_SIZE, ICON_SIZE))
+            if self._icon is not None else None
+        )
 
         self.setWindowFlags(
             Qt.WindowType.FramelessWindowHint
             | Qt.WindowType.WindowStaysOnTopHint
-            | Qt.WindowType.Tool              # no taskbar entry
-            | Qt.WindowType.WindowTransparentForInput  # click-through
+            | Qt.WindowType.Tool
+            | Qt.WindowType.WindowTransparentForInput
         )
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
         self.setAttribute(Qt.WidgetAttribute.WA_ShowWithoutActivating)
-        self.resize(PANEL_WIDTH, PANEL_HEIGHT)
+        self.resize(PANEL_WIDTH, PANEL_HEIGHT + 14)  # extra room for shadow
         self._reposition()
+
+        # Fade animation on window opacity
+        self.setWindowOpacity(0.0)
+        self._fade = QPropertyAnimation(self, b"windowOpacity", self)
+        self._fade.setDuration(FADE_MS)
+        self._fade.setEasingCurve(QEasingCurve.Type.OutCubic)
+
+        # Pulse animation for recording dot (scale 1.0 ↔ 1.35)
+        self._pulse_phase = 0.0
+        self._pulse_timer = QTimer(self)
+        self._pulse_timer.timeout.connect(self._tick_pulse)
 
         self._hide_timer = QTimer(self)
         self._hide_timer.setSingleShot(True)
-        self._hide_timer.timeout.connect(self.hide)
+        self._hide_timer.timeout.connect(self._begin_fade_out)
 
     # ── public API ────────────────────────────────────────────────
 
     def show_recording(self) -> None:
         self._hide_timer.stop()
-        self._dot_color = _DOT_RECORD
+        self._state = "recording"
         self._text = "录音中…"
         self._reposition()
-        self.show()
-        self.raise_()
+        self._fade_in()
+        self._pulse_phase = 0.0
+        self._pulse_timer.start(40)  # ~25fps
         self.update()
 
     def show_processing(self) -> None:
         self._hide_timer.stop()
-        self._dot_color = _DOT_PROCESS
+        self._pulse_timer.stop()
+        self._state = "processing"
         self._text = "识别中…"
         self.update()
 
     def show_success(self, text: str) -> None:
+        self._pulse_timer.stop()
         preview = text if len(text) <= 28 else text[:28] + "…"
-        self._dot_color = _DOT_PROCESS
-        self._text = f"✓ {preview}"
+        self._state = "processing"
+        self._text = f"✓  {preview}"
         self.update()
-        self._hide_timer.start(1000)
+        self._hide_timer.start(1200)
 
     def show_error(self, msg: str) -> None:
+        self._pulse_timer.stop()
         preview = msg if len(msg) <= 28 else msg[:28] + "…"
-        self._dot_color = _DOT_RECORD
-        self._text = f"✗ {preview}"
+        self._state = "error"
+        self._text = f"✗  {preview}"
         self.update()
-        self._hide_timer.start(1500)
+        self._hide_timer.start(1800)
 
     def hide_panel(self) -> None:
         self._hide_timer.stop()
-        self.hide()
+        self._pulse_timer.stop()
+        self._begin_fade_out()
 
-    # ── internals ─────────────────────────────────────────────────
+    # ── animation helpers ─────────────────────────────────────────
+
+    def _fade_in(self) -> None:
+        self.show()
+        self.raise_()
+        self._fade.stop()
+        self._fade.setStartValue(self.windowOpacity())
+        self._fade.setEndValue(1.0)
+        self._fade.start()
+
+    def _begin_fade_out(self) -> None:
+        if not self.isVisible():
+            return
+        self._fade.stop()
+        self._fade.setStartValue(self.windowOpacity())
+        self._fade.setEndValue(0.0)
+        try:
+            self._fade.finished.disconnect()
+        except (TypeError, RuntimeError):
+            pass
+        self._fade.finished.connect(self.hide)
+        self._fade.start()
+
+    def _tick_pulse(self) -> None:
+        # Smooth sinusoidal pulse
+        import math
+        self._pulse_phase = (self._pulse_phase + 0.12) % (2 * math.pi)
+        self.update()
+
+    # ── drawing ───────────────────────────────────────────────────
+
+    def _gradient_for_state(self) -> QLinearGradient:
+        top, bot = {
+            "recording": (_REC_TOP, _REC_BOT),
+            "processing": (_PROC_TOP, _PROC_BOT),
+            "error": (_ERR_TOP, _ERR_BOT),
+        }[self._state]
+        g = QLinearGradient(0, 0, 0, PANEL_HEIGHT)
+        g.setColorAt(0.0, top)
+        g.setColorAt(1.0, bot)
+        return g
+
+    def paintEvent(self, _evt) -> None:  # noqa: N802 (Qt API)
+        import math
+        p = QPainter(self)
+        p.setRenderHint(QPainter.RenderHint.Antialiasing)
+
+        # Shadow: paint a soft dark rounded rect slightly offset below
+        shadow_rect = QRectF(4, 8, PANEL_WIDTH - 8, PANEL_HEIGHT)
+        shadow_color = QColor(_SHADOW)
+        for i in range(6, 0, -1):
+            shadow_color.setAlpha(12 * i)
+            p.setBrush(QBrush(shadow_color))
+            p.setPen(Qt.PenStyle.NoPen)
+            p.drawRoundedRect(
+                shadow_rect.adjusted(-i * 0.3, -i * 0.3, i * 0.3, i * 0.3 + i),
+                CORNER_RADIUS + i * 0.5, CORNER_RADIUS + i * 0.5,
+            )
+
+        # Main pill
+        body_rect = QRectF(0, 4, PANEL_WIDTH, PANEL_HEIGHT)
+        p.setBrush(QBrush(self._gradient_for_state()))
+        p.setPen(QPen(_BORDER, 1))
+        p.drawRoundedRect(body_rect, CORNER_RADIUS, CORNER_RADIUS)
+
+        # Left side: app icon
+        content_y = 4
+        if self._icon_pix is not None:
+            icon_x = 16
+            icon_y = content_y + (PANEL_HEIGHT - ICON_SIZE) // 2
+            p.drawPixmap(icon_x, icon_y, self._icon_pix)
+            text_x = icon_x + ICON_SIZE + 14
+        else:
+            text_x = 22
+
+        # Recording: pulsing dot overlay on the icon's corner
+        if self._state == "recording":
+            scale = 1.0 + 0.35 * (0.5 + 0.5 * math.sin(self._pulse_phase))
+            ds = int(DOT_SIZE * scale)
+            cx = 16 + ICON_SIZE - ds // 2 + 2
+            cy = content_y + (PANEL_HEIGHT - ICON_SIZE) // 2 - ds // 2 + 2
+            # glow
+            glow = QColor(255, 60, 60, 90)
+            p.setBrush(QBrush(glow))
+            p.setPen(Qt.PenStyle.NoPen)
+            p.drawEllipse(cx - 3, cy - 3, ds + 6, ds + 6)
+            # solid dot
+            p.setBrush(QBrush(QColor(255, 80, 80, 250)))
+            p.drawEllipse(cx, cy, ds, ds)
+
+        # Text
+        p.setPen(_TEXT)
+        font = QFont()
+        font.setPointSize(11)
+        font.setWeight(QFont.Weight.DemiBold)
+        p.setFont(font)
+        fm = QFontMetrics(font)
+        text_y = content_y + (PANEL_HEIGHT + fm.ascent() - fm.descent()) // 2
+        p.drawText(int(text_x), int(text_y), self._text)
+
+    # ── positioning ───────────────────────────────────────────────
 
     def _reposition(self) -> None:
         screen = QGuiApplication.primaryScreen()
@@ -92,35 +245,5 @@ class FloatingWindow(QWidget):
             return
         geo = screen.availableGeometry()
         x = geo.x() + (geo.width() - PANEL_WIDTH) // 2
-        y = geo.y() + 24
+        y = geo.y() + 28
         self.move(QPoint(x, y))
-
-    def paintEvent(self, _evt) -> None:  # noqa: N802 (Qt API)
-        p = QPainter(self)
-        p.setRenderHint(QPainter.RenderHint.Antialiasing)
-
-        # Background rounded rect
-        p.setBrush(QBrush(_BG))
-        p.setPen(Qt.PenStyle.NoPen)
-        p.drawRoundedRect(
-            QRectF(0, 0, self.width(), self.height()),
-            CORNER_RADIUS, CORNER_RADIUS,
-        )
-
-        # Dot
-        p.setBrush(QBrush(self._dot_color))
-        dot_size = 10
-        dot_x = 18
-        dot_y = (self.height() - dot_size) // 2
-        p.drawEllipse(dot_x, dot_y, dot_size, dot_size)
-
-        # Text
-        p.setPen(_TEXT)
-        font = QFont()
-        font.setPointSize(11)
-        font.setWeight(QFont.Weight.Medium)
-        p.setFont(font)
-        fm = QFontMetrics(font)
-        text_x = dot_x + dot_size + 12
-        text_y = (self.height() + fm.ascent() - fm.descent()) // 2
-        p.drawText(text_x, text_y, self._text)

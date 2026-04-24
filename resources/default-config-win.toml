@@ -3,11 +3,16 @@
 
 [hotkey]
 # Push-to-talk key name (see `keyboard` library docs). Recommended:
-#   "right alt"   — rarely used on Chinese keyboards, no side effects
-#   "caps lock"   — classic PTT; Windows will still toggle the caps lock LED
+#   "caps lock"   — default; the app suppresses its toggle effect so it
+#                   behaves purely as a hold-to-talk button
+#   "right alt"   — safe, no side effects
 #   "f9"          — function keys are safe
 #   "right ctrl"  — works but can conflict with some shortcuts
-ptt = "right alt"
+ptt = "caps lock"
+# When the PTT key is caps lock, intercept the key event to prevent
+# Windows from actually toggling caps lock state. Set false if you
+# still want the LED to toggle when using CapsLock as PTT.
+suppress_caps_lock_toggle = true
 
 [audio]
 # sounddevice device identifier. Empty = system default input.
