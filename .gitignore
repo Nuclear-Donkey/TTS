@@ -43,3 +43,10 @@ Thumbs.db
 /.claude/settings.local.json
 /tmp/
 *.wav
+
+# Per-platform sync of shared/ — canonical source lives in /shared,
+# install.bat / setup.sh copy it into <platform>/src/shared before
+# pip install -e . . Don't track the copies.
+/windows/src/shared/
+/linux/src/shared/
+/macos/src/shared/

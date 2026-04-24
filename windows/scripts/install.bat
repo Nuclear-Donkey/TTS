@@ -78,6 +78,21 @@ if "!REBUILD_VENV!"=="1" (
     echo [2/5] Reusing existing .venv
 )
 
+REM ---- 2b. Sync shared/ from the repo root into src\shared ----
+REM The shared package lives one level up in <repo>\shared; pip install -e .
+REM only picks up packages under windows\src, so we mirror it here.
+REM (Added to .gitignore to avoid double-tracking.)
+set "SHARED_SRC=%PROJECT_ROOT%\..\shared"
+set "SHARED_DST=%PROJECT_ROOT%\src\shared"
+if not exist "%SHARED_SRC%" (
+    echo ERROR: shared/ not found at %SHARED_SRC%.
+    echo Make sure you cloned the full repo, not just windows/.
+    goto :fail
+)
+if exist "%SHARED_DST%" rmdir /s /q "%SHARED_DST%"
+xcopy /e /i /q /y "%SHARED_SRC%" "%SHARED_DST%" >nul
+if errorlevel 1 goto :fail
+
 REM ---- 3. Runtime + build deps in one shot ----
 echo [3/5] Installing dependencies ^(this takes a few minutes^) ...
 %VENV_PY% -m pip install --upgrade pip wheel --quiet
@@ -174,7 +189,7 @@ echo   Executable:   %EXE%
 echo   Desktop:      %LNK%
 echo.
 echo   Double-click the desktop "voice-input" icon to launch.
-echo   Hold [right alt] in any text box to dictate.
+echo   Hold [Caps Lock] in any text box to dictate.
 echo ============================================================
 echo.
 pause

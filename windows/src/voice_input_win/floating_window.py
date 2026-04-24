@@ -241,25 +241,34 @@ class FloatingWindow(QWidget):
         p = QPainter(self)
         p.setRenderHint(QPainter.RenderHint.Antialiasing)
 
-        # Soft shadow (layered rounded rects under the body)
         body_top = 2
-        shadow_color = QColor(_SHADOW)
-        for i in range(6, 0, -1):
-            shadow_color.setAlpha(10 * i)
-            p.setBrush(QBrush(shadow_color))
-            p.setPen(Qt.PenStyle.NoPen)
-            p.drawRoundedRect(
-                QRectF(
-                    -i * 0.6, body_top + i * 0.6,
-                    PANEL_WIDTH + i * 1.2, PANEL_HEIGHT + i * 1.2,
-                ),
-                CORNER_RADIUS + i * 0.4, CORNER_RADIUS + i * 0.4,
-            )
-
-        # Body fill (acrylic will show through alpha; we still fill
-        # because blur might not be enabled on older Windows)
         body_rect = QRectF(0, body_top, PANEL_WIDTH, PANEL_HEIGHT)
-        p.setBrush(QBrush(_BG))
+
+        # When DWM Acrylic blur is active the system already provides
+        # depth; layering Qt-drawn shadow under the body would leak
+        # through the blur and look double-bordered. Skip shadow in
+        # that case and only draw a single fill + hairline border.
+        if not self._blur_enabled:
+            shadow_color = QColor(_SHADOW)
+            for i in range(4, 0, -1):
+                shadow_color.setAlpha(8 * i)
+                p.setBrush(QBrush(shadow_color))
+                p.setPen(Qt.PenStyle.NoPen)
+                p.drawRoundedRect(
+                    QRectF(
+                        -i * 0.5, body_top + i * 0.5,
+                        PANEL_WIDTH + i * 1.0, PANEL_HEIGHT + i * 1.0,
+                    ),
+                    CORNER_RADIUS + i * 0.3, CORNER_RADIUS + i * 0.3,
+                )
+
+        # Body fill. Alpha is lower when Acrylic is active so the
+        # blur actually shows through; higher otherwise so it still
+        # reads as "a panel" on systems without blur.
+        bg = QColor(_BG)
+        if self._blur_enabled:
+            bg.setAlpha(150)
+        p.setBrush(QBrush(bg))
         p.setPen(QPen(_BORDER, 0.75))
         p.drawRoundedRect(body_rect, CORNER_RADIUS, CORNER_RADIUS)
 

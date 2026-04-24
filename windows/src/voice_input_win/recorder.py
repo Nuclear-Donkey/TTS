@@ -1,5 +1,5 @@
 """Re-export from shared module for backward compatibility."""
-from voice_input_common.audio import (  # noqa: F401
+from shared.audio import (  # noqa: F401
     Recorder,
     RecorderError,
     pcm_rms,

@@ -27,7 +27,7 @@ from voice_input_win.paths import CONFIG_FILE, CONFIG_DIR, LOG_DIR, LOG_FILE
 from voice_input_win.recorder import Recorder, RecorderError
 from voice_input_win.stt import ParaformerStt, SttError
 from voice_input_win.tray import TrayIcon
-from voice_input_common.audio import list_input_devices
+from shared.audio import list_input_devices
 
 
 # ── logging (file-only by default; no console handler in GUI mode) ──

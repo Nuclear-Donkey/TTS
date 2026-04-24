@@ -23,8 +23,8 @@ from voice_input_macos.accessibility import check_accessibility, prompt_accessib
 from voice_input_macos.floating_window import FloatingWindow
 from voice_input_macos.hotkey import HotkeyController, State
 from voice_input_macos.paths import CONFIG_FILE, LOG_DIR, LOG_FILE
-from voice_input_common.audio import Recorder, RecorderError, list_input_devices
-from voice_input_common.stt import ParaformerStt, SttError
+from shared.audio import Recorder, RecorderError, list_input_devices
+from shared.stt import ParaformerStt, SttError
 
 
 # ── logging ───────────────────────────────────────────────────

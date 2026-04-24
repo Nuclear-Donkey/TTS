@@ -12,7 +12,7 @@ import tomllib
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from voice_input_common.config import apply_section
+from shared.config import apply_section
 from voice_input_win.paths import CONFIG_FILE, MODEL_DIR
 
 log = logging.getLogger(__name__)

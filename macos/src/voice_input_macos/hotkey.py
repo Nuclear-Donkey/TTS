@@ -22,7 +22,7 @@ from pynput import keyboard
 
 from voice_input_macos.injector import InjectError, paste_text
 from voice_input_macos.paths import LOG_DIR
-from voice_input_common.audio import Recorder, RecorderError, pcm_rms, pcm_to_wav
+from shared.audio import Recorder, RecorderError, pcm_rms, pcm_to_wav
 
 log = logging.getLogger(__name__)
 

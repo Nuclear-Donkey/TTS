@@ -6,7 +6,7 @@
 # Output:  dist\voice-input.exe   (single file, ~180-220 MB)
 #
 # Requires:
-#   pip install pyinstaller pyqt6 sherpa-onnx sounddevice keyboard pyperclip numpy
+#   pip install pyinstaller PySide6 sherpa-onnx sounddevice keyboard pyperclip numpy
 
 # -*- mode: python ; coding: utf-8 -*-
 from pathlib import Path
