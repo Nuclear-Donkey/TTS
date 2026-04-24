@@ -139,23 +139,24 @@ def main() -> int:
 
     @Slot(str)
     def _on_state(name: str) -> None:
+        # Panel shows only while the PTT key is held. Pressing =
+        # RECORDING → show; releasing = PROCESSING → hide immediately.
+        # The recognised text arrives asynchronously via _on_text and
+        # is delivered as a tray balloon instead of a panel flash.
         if name == State.RECORDING.value:
             window.show_recording()
-        elif name == State.PROCESSING.value:
-            window.show_processing()
-        # IDLE: let text_ready / error_occurred handle final display.
+        else:
+            window.hide_panel()
 
     @Slot(str)
     def _on_text(text: str) -> None:
-        window.show_success(text)
+        # Tray notification instead of panel — panel is already gone.
+        preview = text if len(text) <= 40 else text[:40] + "…"
+        tray.notify("voice-input", f"✓ {preview}", 1400)
 
     @Slot(str)
     def _on_err(msg: str) -> None:
-        window.show_error(msg)
-
-    bridge.state_changed.connect(_on_state)
-    bridge.text_ready.connect(_on_text)
-    bridge.error_occurred.connect(_on_err)
+        tray.notify("voice-input", f"✗ {msg}", 2000)
 
     # Devices
     devices = list_input_devices()
@@ -177,6 +178,11 @@ def main() -> int:
         on_device_change=_change_device,
         on_quit=_quit,
     )
+
+    # Wire bridge callbacks after tray exists (they reference it).
+    bridge.state_changed.connect(_on_state)
+    bridge.text_ready.connect(_on_text)
+    bridge.error_occurred.connect(_on_err)
 
     # Hotkey controller on background thread
     controller = HotkeyController(

@@ -143,17 +143,28 @@ if errorlevel 1 (
     goto :fail
 )
 
-REM ---- Desktop shortcut ----
+REM ---- Desktop shortcut (always recreate so new icon takes effect) ----
 set "EXE=%PROJECT_ROOT%\dist\voice-input.exe"
 set "LNK=%USERPROFILE%\Desktop\voice-input.lnk"
 
 echo Creating desktop shortcut ...
+if exist "%LNK%" del /q "%LNK%"
 powershell -NoProfile -Command ^
     "$s=(New-Object -ComObject WScript.Shell).CreateShortcut('%LNK%');" ^
     "$s.TargetPath='%EXE%';" ^
     "$s.WorkingDirectory='%PROJECT_ROOT%\dist';" ^
-    "$s.IconLocation='%EXE%';" ^
+    "$s.IconLocation='%EXE%,0';" ^
     "$s.Save()"
+
+REM ---- Clear Windows icon cache so the new .ico is picked up ----
+REM Explorer caches shortcut icons aggressively; without this, users
+REM see the previous icon until a reboot.
+echo Clearing Windows icon cache ...
+taskkill /f /im explorer.exe >nul 2>&1
+del /f /q "%LOCALAPPDATA%\IconCache.db" >nul 2>&1
+del /f /q "%LOCALAPPDATA%\Microsoft\Windows\Explorer\iconcache_*.db" >nul 2>&1
+del /f /q "%LOCALAPPDATA%\Microsoft\Windows\Explorer\thumbcache_*.db" >nul 2>&1
+start explorer.exe
 
 echo.
 echo ============================================================
